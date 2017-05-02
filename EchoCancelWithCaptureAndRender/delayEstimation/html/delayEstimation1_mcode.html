@@ -1,0 +1,25 @@
+<!-- saved from url=(0014)about:internet -->
+<html>
+<body>
+<script src="resources/eml_report_loadable_data.js"></script>
+<pre class="code">
+<span class="srcline"><span class="lineno"><a href="1,1" id="srcline1"> 1</a></span><span class="line"><span class="keyword">function</span> [<span class="var type1" id="S2T2U3">delay</span>] = delayEstimation(<span class="var type1" id="S3T3U6">farEndSound</span>, <span class="var type1" id="S4T3U7">nearEndSound</span>)</span></span>
+<span class="srcline"><span class="lineno"><a href="1,2" id="srcline2"> 2</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,3" id="srcline3"> 3</a></span><span class="line"> <span class="mxinfo " id="T2:U5"><span class="var type1" id="S5T2U10">N</span> = <span class="mxinfo  sgl" id="T2:U7">length(<span class="var type1 sgl" id="S3T3U13">farEndSound</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,4" id="srcline4"> 4</a></span><span class="line"><span class="comment">%%</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,5" id="srcline5"> 5</a></span><span class="line"><span class="mxinfo " id="T4:U9"><span class="var type1" id="S7T4U16">X1</span> = <span class="mxinfo  sgl" id="T4:U11">fft(<span class="var type1 sgl" id="S3T3U19">farEndSound</span>, <span class="mxinfo  sgl" id="T2:U13"><span class="mxinfo  sgl" id="T2:U14">2*<span class="var type1" id="S5T2U23">N</span></span>-1</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,6" id="srcline6"> 6</a></span><span class="line"><span class="mxinfo " id="T4:U16"><span class="var type1" id="S9T4U27">X2</span> = <span class="mxinfo  sgl" id="T4:U18">fft(<span class="var type1 sgl" id="S4T3U30">nearEndSound</span>, <span class="mxinfo  sgl" id="T2:U20"><span class="mxinfo  sgl" id="T2:U21">2*<span class="var type1" id="S5T2U34">N</span></span>-1</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,7" id="srcline7"> 7</a></span><span class="line"><span class="mxinfo " id="T4:U23"><span class="var type1" id="S10T4U38">Sxy</span>=<span class="mxinfo  sgl" id="T4:U25"><span class="var type1" id="S7T4U40">X1</span>.*<span class="mxinfo  sgl" id="T4:U27">conj(<span class="var type1 sgl" id="S9T4U43">X2</span>)</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,8" id="srcline8"> 8</a></span><span class="line"><span class="mxinfo " id="T4:U29"><span class="var type1" id="S12T4U46">Cxy</span>=<span class="mxinfo  sgl" id="T4:U31">fftshift(<span class="mxinfo  sgl" id="T4:U32">ifft(<span class="var type1" id="S10T4U51">Sxy</span>)</span>)</span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,9" id="srcline9"> 9</a></span><span class="line"><span class="comment">% Cxy=Cxy(1:N);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,10" id="srcline10">10</a></span><span class="line">[<span class="var type1" id="S15T1U55">maxa</span>,<span class="mxinfo  sgl" id="T2:U35"><span class="var type1 sgl" id="S16T2U56"><span class="message warning" id="M1F1C">location</span></span></span>]=max(<span class="var type1" id="S12T4U59">Cxy</span>);</span></span>
+<span class="srcline"><span class="lineno"><a href="1,11" id="srcline11">11</a></span><span class="line"><span class="mxinfo  sgl" id="T2:U37"><span class="var type1" id="S2T2U62">delay</span> = <span class="mxinfo  sgl" id="T2:U39"><span class="var type1" id="S5T2U64">N</span> - <span class="var type1" id="S16T2U65">location</span></span></span>;</span></span>
+<span class="srcline"><span class="lineno"><a href="1,12" id="srcline12">12</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,13" id="srcline13">13</a></span><span class="line"></span></span>
+<span class="srcline"><span class="lineno"><a href="1,14" id="srcline14">14</a></span><span class="line"><span class="comment">%%</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,15" id="srcline15">15</a></span><span class="line"><span class="comment">% Cxy2=xcorr(farEndSound,nearEndSound);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,16" id="srcline16">16</a></span><span class="line"><span class="comment">% [max1,location1]=max(Cxy2);</span></span></span>
+<span class="srcline"><span class="lineno"><a href="1,17" id="srcline17">17</a></span><span class="line"><span class="comment">% delay = N - location1;</span></span></span>
+</pre>
+</body>
+</html>
