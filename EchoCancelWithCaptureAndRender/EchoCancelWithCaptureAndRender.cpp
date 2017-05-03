@@ -11,10 +11,21 @@
 const int ciFrameSize = 480;
 
 
+
+
 int main()
 {
 	CWASAPICapture *capturer = InitCapturer();
 	CWASAPIRenderer *renderer = InitRenderer();
+	if (capturer == nullptr)
+		return -1;
+	if (renderer == nullptr)
+		return -1;
+
+	if (renderer->Initialize(50) && capturer->Initialize(20))
+	{
+		
+	}
 
 	//‘∂∂À”Ô“Ù ˝æ›
 	short *sFarEnd = new short[ciFrameSize];
