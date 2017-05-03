@@ -1,0 +1,66 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tga;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="delayEstimation">
+      <UniqueIdentifier>{4bd37307-922b-4968-b1d7-27383737d572}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AEC.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="delayEstimation\delayEstimation.cpp">
+      <Filter>delayEstimation</Filter>
+    </ClCompile>
+    <ClCompile Include="delayEstimation\delayEstimation_emxAPI.cpp">
+      <Filter>delayEstimation</Filter>
+    </ClCompile>
+    <ClCompile Include="delayEstimation\delayEstimation_emxutil.cpp">
+      <Filter>delayEstimation</Filter>
+    </ClCompile>
+    <ClCompile Include="delayEstimation\rt_nonfinite.cpp">
+      <Filter>delayEstimation</Filter>
+    </ClCompile>
+    <ClCompile Include="delayEstimation\rtGetInf.cpp">
+      <Filter>delayEstimation</Filter>
+    </ClCompile>
+    <ClCompile Include="delayEstimation\rtGetNaN.cpp">
+      <Filter>delayEstimation</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AEC.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="targetver.h" />
+    <ClInclude Include="delayEstimation\delayEstimation.h">
+      <Filter>delayEstimation</Filter>
+    </ClInclude>
+    <ClInclude Include="delayEstimation\delayEstimation_emxAPI.h">
+      <Filter>delayEstimation</Filter>
+    </ClInclude>
+    <ClInclude Include="delayEstimation\delayEstimation_emxutil.h">
+      <Filter>delayEstimation</Filter>
+    </ClInclude>
+    <ClInclude Include="delayEstimation\delayEstimation_types.h">
+      <Filter>delayEstimation</Filter>
+    </ClInclude>
+    <ClInclude Include="delayEstimation\rt_defines.h">
+      <Filter>delayEstimation</Filter>
+    </ClInclude>
+    <ClInclude Include="delayEstimation\rt_nonfinite.h">
+      <Filter>delayEstimation</Filter>
+    </ClInclude>
+    <ClInclude Include="delayEstimation\rtGetInf.h">
+      <Filter>delayEstimation</Filter>
+    </ClInclude>
+    <ClInclude Include="delayEstimation\rtGetNaN.h">
+      <Filter>delayEstimation</Filter>
+    </ClInclude>
+    <ClInclude Include="delayEstimation\rtwtypes.h">
+      <Filter>delayEstimation</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

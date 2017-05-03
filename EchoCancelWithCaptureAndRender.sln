@@ -5,22 +5,40 @@ VisualStudioVersion = 15.0.26403.7
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EchoCancelWithCaptureAndRender", "EchoCancelWithCaptureAndRender\EchoCancelWithCaptureAndRender.vcxproj", "{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AEC", "AEC\AEC.vcxproj", "{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|ARM = Debug|ARM
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
+		Release|ARM = Release|ARM
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}.Debug|ARM.ActiveCfg = Debug|Win32
 		{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}.Debug|x64.ActiveCfg = Debug|x64
 		{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}.Debug|x64.Build.0 = Debug|x64
 		{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}.Debug|x86.ActiveCfg = Debug|Win32
 		{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}.Debug|x86.Build.0 = Debug|Win32
+		{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}.Release|ARM.ActiveCfg = Release|Win32
 		{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}.Release|x64.ActiveCfg = Release|x64
 		{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}.Release|x64.Build.0 = Release|x64
 		{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}.Release|x86.ActiveCfg = Release|Win32
 		{BC3B7B87-DB8C-4849-845F-F18D6BACFA5B}.Release|x86.Build.0 = Release|Win32
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Debug|ARM.ActiveCfg = Debug|ARM
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Debug|ARM.Build.0 = Debug|ARM
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Debug|x64.ActiveCfg = Debug|x64
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Debug|x64.Build.0 = Debug|x64
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Debug|x86.ActiveCfg = Debug|Win32
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Debug|x86.Build.0 = Debug|Win32
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Release|ARM.ActiveCfg = Release|ARM
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Release|ARM.Build.0 = Release|ARM
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Release|x64.ActiveCfg = Release|x64
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Release|x64.Build.0 = Release|x64
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Release|x86.ActiveCfg = Release|Win32
+		{7CCFA395-A52C-4AAF-B72E-20A3406D30FF}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

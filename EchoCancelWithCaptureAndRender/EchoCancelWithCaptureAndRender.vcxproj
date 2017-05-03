@@ -88,9 +88,11 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>avrt.lib;winmm.lib;aec.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -138,27 +140,13 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="delayEstimation\delayEstimation.h" />
-    <ClInclude Include="delayEstimation\delayEstimation_emxAPI.h" />
-    <ClInclude Include="delayEstimation\delayEstimation_emxutil.h" />
-    <ClInclude Include="delayEstimation\delayEstimation_types.h" />
-    <ClInclude Include="delayEstimation\rtGetInf.h" />
-    <ClInclude Include="delayEstimation\rtGetNaN.h" />
-    <ClInclude Include="delayEstimation\rtwtypes.h" />
-    <ClInclude Include="delayEstimation\rt_defines.h" />
-    <ClInclude Include="delayEstimation\rt_nonfinite.h" />
+    <ClInclude Include="audio.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="WASAPICapture.h" />
     <ClInclude Include="WASAPIRenderer.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="delayEstimation\delayEstimation.cpp" />
-    <ClCompile Include="delayEstimation\delayEstimation_emxAPI.cpp" />
-    <ClCompile Include="delayEstimation\delayEstimation_emxutil.cpp" />
-    <ClCompile Include="delayEstimation\rtGetInf.cpp" />
-    <ClCompile Include="delayEstimation\rtGetNaN.cpp" />
-    <ClCompile Include="delayEstimation\rt_nonfinite.cpp" />
     <ClCompile Include="EchoCancelWithCaptureAndRender.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

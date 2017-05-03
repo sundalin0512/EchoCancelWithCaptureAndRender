@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="delayEstimation">
-      <UniqueIdentifier>{62ee4a95-dcdf-4bd9-9e23-73ce9c9f9feb}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -33,32 +30,8 @@
     <ClInclude Include="WASAPIRenderer.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="delayEstimation\delayEstimation.h">
-      <Filter>delayEstimation</Filter>
-    </ClInclude>
-    <ClInclude Include="delayEstimation\delayEstimation_emxAPI.h">
-      <Filter>delayEstimation</Filter>
-    </ClInclude>
-    <ClInclude Include="delayEstimation\delayEstimation_emxutil.h">
-      <Filter>delayEstimation</Filter>
-    </ClInclude>
-    <ClInclude Include="delayEstimation\delayEstimation_types.h">
-      <Filter>delayEstimation</Filter>
-    </ClInclude>
-    <ClInclude Include="delayEstimation\rt_defines.h">
-      <Filter>delayEstimation</Filter>
-    </ClInclude>
-    <ClInclude Include="delayEstimation\rt_nonfinite.h">
-      <Filter>delayEstimation</Filter>
-    </ClInclude>
-    <ClInclude Include="delayEstimation\rtGetInf.h">
-      <Filter>delayEstimation</Filter>
-    </ClInclude>
-    <ClInclude Include="delayEstimation\rtGetNaN.h">
-      <Filter>delayEstimation</Filter>
-    </ClInclude>
-    <ClInclude Include="delayEstimation\rtwtypes.h">
-      <Filter>delayEstimation</Filter>
+    <ClInclude Include="audio.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -73,24 +46,6 @@
     </ClCompile>
     <ClCompile Include="WASAPIRenderer.cpp">
       <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="delayEstimation\delayEstimation.cpp">
-      <Filter>delayEstimation</Filter>
-    </ClCompile>
-    <ClCompile Include="delayEstimation\delayEstimation_emxAPI.cpp">
-      <Filter>delayEstimation</Filter>
-    </ClCompile>
-    <ClCompile Include="delayEstimation\delayEstimation_emxutil.cpp">
-      <Filter>delayEstimation</Filter>
-    </ClCompile>
-    <ClCompile Include="delayEstimation\rt_nonfinite.cpp">
-      <Filter>delayEstimation</Filter>
-    </ClCompile>
-    <ClCompile Include="delayEstimation\rtGetInf.cpp">
-      <Filter>delayEstimation</Filter>
-    </ClCompile>
-    <ClCompile Include="delayEstimation\rtGetNaN.cpp">
-      <Filter>delayEstimation</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
