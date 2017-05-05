@@ -76,5 +76,8 @@ public:
 		EXIT_ON_ERROR(hr)
 			return hr;
 	}
+	HRESULT Start();
+	HRESULT Stop();
+	static HRESULT RunThread();
 };
 
