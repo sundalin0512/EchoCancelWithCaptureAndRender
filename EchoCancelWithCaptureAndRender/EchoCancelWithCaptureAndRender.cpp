@@ -2,9 +2,7 @@
 //
 
 #include "stdafx.h"
-#include "WASAPICapture.h"
-#include "WASAPIRenderer.h"
-#include "audio.h"
+
 #include "../AEC/delayEstimation/delayEstimation.h"
 #include "../AEC/delayEstimation/delayEstimation_emxAPI.h"
 
@@ -15,17 +13,6 @@ const int ciFrameSize = 480;
 
 int main()
 {
-	CWASAPICapture *capturer = InitCapturer();
-	CWASAPIRenderer *renderer = InitRenderer();
-	if (capturer == nullptr)
-		return -1;
-	if (renderer == nullptr)
-		return -1;
-
-	if (renderer->Initialize(50) && capturer->Initialize(20))
-	{
-		
-	}
 
 	//‘∂∂À”Ô“Ù ˝æ›
 	short *sFarEnd = new short[ciFrameSize];

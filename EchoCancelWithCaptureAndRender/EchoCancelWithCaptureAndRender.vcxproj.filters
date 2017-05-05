@@ -24,13 +24,10 @@
     <ClInclude Include="targetver.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="WASAPICapture.h">
+    <ClInclude Include="RenderClient.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="WASAPIRenderer.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="audio.h">
+    <ClInclude Include="CaptureClient.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -41,10 +38,10 @@
     <ClCompile Include="EchoCancelWithCaptureAndRender.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="WASAPICapture.cpp">
+    <ClCompile Include="RenderClient.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="WASAPIRenderer.cpp">
+    <ClCompile Include="CaptureClient.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -23,6 +23,13 @@
 
 static bool DisableMMCSS;
 
+#define EXIT_ON_ERROR(hres)  \
+			  if (FAILED(hres)) { exit(-1); }
+#define SAFE_RELEASE(punk)  \
+			  if ((punk) != NULL)  \
+				{ (punk)->Release(); (punk) = NULL; }
+
+
 template <class T> void SafeRelease(T **ppT)
 {
 	if (*ppT)
