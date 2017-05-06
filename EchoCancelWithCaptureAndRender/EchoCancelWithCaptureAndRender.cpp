@@ -44,14 +44,38 @@ UINT tmpRenderFramesNum;
 float *tmpCaptureData;
 UINT tmpCaptureFramesNum;
 WaveData *RenderDataQueue;
+WaveData *CurrentRenderData;
 WaveData *RenderDataTail;
 WaveData *CaptureDataQueue;
 WaveData *CaptureDataTail;
 
 
-HRESULT LoadRenderData(BYTE *data, UINT numFrames)
+HRESULT LoadRenderDataThread()
 {
+	HANDLE hEvent = OpenEvent(EVENT_ALL_ACCESS, false, szLoadRenderDataEvent);
+	while (true)
+	{
+		WaitForSingleObject(hEvent, INFINITE);
+		EnterCriticalSection(&criticalSection);
+		static int position = 0;
+		int renderDataPosition = 0;
+		tmpRenderData = new float[tmpRenderFramesNum * 2];
+		while (CurrentRenderData->next != nullptr && renderDataPosition < tmpRenderFramesNum)
+		{
+			if (position == 0)
+				CurrentRenderData = CurrentRenderData->next;
+			for (; position < CurrentRenderData->size && renderDataPosition < tmpRenderFramesNum; position++, renderDataPosition++)
+			{
+				tmpRenderData[renderDataPosition * 2] = CurrentRenderData->data[position];
+				tmpRenderData[renderDataPosition * 2 + 1] = CurrentRenderData->data[position];
+			}
+			if (position == CurrentRenderData->size)
+				position = 0;
 
+		}
+		//tmpRenderFramesNum = 20000;
+		LeaveCriticalSection(&criticalSection);
+	}
 	return S_OK;
 }
 
@@ -91,6 +115,9 @@ HRESULT RenderThread()
 	UINT32 numFramesPadding;
 	BYTE *pData;
 	DWORD flags = 0;
+
+	HANDLE hEvent = CreateEvent(NULL, true, false, szLoadRenderDataEvent);
+	HANDLE hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)LoadRenderDataThread, NULL, 0, 0);
 
 	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 	hr = CoCreateInstance(
@@ -138,7 +165,17 @@ HRESULT RenderThread()
 	EXIT_ON_ERROR(hr);
 
 	// Load the initial data into the shared buffer.
-	LoadRenderData(pData, bufferFrameCount);
+	EnterCriticalSection(&criticalSection);
+	tmpRenderFramesNum = bufferFrameCount;
+	LeaveCriticalSection(&criticalSection);
+	PulseEvent(hEvent);
+	Sleep(1);
+	EnterCriticalSection(&criticalSection);
+	CopyMemory(pData, tmpRenderData, tmpRenderFramesNum * 8);
+	delete[] tmpRenderData;
+	bufferFrameCount = tmpRenderFramesNum;
+	LeaveCriticalSection(&criticalSection);
+
 	EXIT_ON_ERROR(hr);
 
 	hr = pRenderClient->ReleaseBuffer(bufferFrameCount, flags);
@@ -168,7 +205,16 @@ HRESULT RenderThread()
 		EXIT_ON_ERROR(hr);
 
 		// Get next 1/2-second of data from the audio source.
-		LoadRenderData(pData, bufferFrameCount);
+		EnterCriticalSection(&criticalSection);
+		tmpRenderFramesNum = bufferFrameCount;
+		LeaveCriticalSection(&criticalSection);
+		PulseEvent(hEvent);
+		Sleep(1);
+		EnterCriticalSection(&criticalSection);
+		CopyMemory(pData, tmpRenderData, tmpRenderFramesNum * 8);
+		delete[] tmpRenderData;
+		bufferFrameCount = tmpRenderFramesNum;
+		LeaveCriticalSection(&criticalSection);
 		EXIT_ON_ERROR(hr);
 
 		hr = pRenderClient->ReleaseBuffer(numFramesAvailable, flags);
@@ -315,10 +361,19 @@ int main()
 {
 	RenderDataTail = new WaveData();
 	RenderDataQueue = RenderDataTail;
+	CurrentRenderData = RenderDataTail;
+	RenderDataTail->next = RenderDataTail;
+	RenderDataTail->data = new float[2000];
+	for (int i = 0; i < 2000; i++)
+	{
+		RenderDataTail->data[i] = (rand()%100) / (float)500;
+	}
+	RenderDataTail->size = 2000;
 	CaptureDataTail = new WaveData();
 	CaptureDataQueue = CaptureDataTail;
+	CurrentRenderData = CaptureDataQueue;
 	InitializeCriticalSection(&criticalSection);
-	
+
 	HANDLE hRenderThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)RenderThread, NULL, 0, 0);
 	HANDLE hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, NULL, 0, 0);
 
