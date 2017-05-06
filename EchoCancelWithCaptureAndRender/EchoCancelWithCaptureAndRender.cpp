@@ -6,19 +6,75 @@
 #include "../AEC/delayEstimation/delayEstimation.h"
 #include "../AEC/delayEstimation/delayEstimation_emxAPI.h"
 
-const int ciFrameSize           = 480;
-const int REFTIMES_PER_SEC      = 10000000;
+const int ciFrameSize = 480;
+const int REFTIMES_PER_SEC = 10000000;
 const int REFTIMES_PER_MILLISEC = 10000;
 const CLSID CLSID_MMDeviceEnumerator = __uuidof(MMDeviceEnumerator);
-const IID IID_IMMDeviceEnumerator    = __uuidof(IMMDeviceEnumerator);
-const IID IID_IAudioClient           = __uuidof(IAudioClient);
-const IID IID_IAudioRenderClient     = __uuidof(IAudioRenderClient);
-const IID IID_IAudioCaptureClient    = __uuidof(IAudioCaptureClient);
+const IID IID_IMMDeviceEnumerator = __uuidof(IMMDeviceEnumerator);
+const IID IID_IAudioClient = __uuidof(IAudioClient);
+const IID IID_IAudioRenderClient = __uuidof(IAudioRenderClient);
+const IID IID_IAudioCaptureClient = __uuidof(IAudioCaptureClient);
 
-class RenderBuffer
+const TCHAR *szLoadRenderDataEvent = L"szLoadRenderDataEvent";
+const TCHAR *szSaveCaptureDataEvent = L"szSaveCaptureDataEvent";
+
+CRITICAL_SECTION criticalSection;
+
+class WaveData
+{
+public:
+	float* data;
+	UINT size;
+	WaveData* next;
+
+	WaveData() :
+		data(NULL),
+		size(0),
+		next(NULL)
+	{}
+
+	~WaveData()
+	{
+		delete[] data;
+	}
+};
+
+float *tmpRenderData;
+UINT tmpRenderFramesNum;
+float *tmpCaptureData;
+UINT tmpCaptureFramesNum;
+WaveData *RenderDataQueue;
+WaveData *RenderDataTail;
+WaveData *CaptureDataQueue;
+WaveData *CaptureDataTail;
+
+
+HRESULT LoadRenderData(BYTE *data, UINT numFrames)
 {
 
-};
+	return S_OK;
+}
+
+HRESULT SaveCaptureDataThread()
+{
+	HANDLE hEvent = OpenEvent(EVENT_ALL_ACCESS, false, szSaveCaptureDataEvent);
+	while (true)
+	{
+		WaitForSingleObject(hEvent, INFINITE);
+		EnterCriticalSection(&criticalSection);
+		CaptureDataTail->data = new float[tmpCaptureFramesNum];
+		for (int i = 0; i < tmpCaptureFramesNum; i++)
+		{
+			CaptureDataTail->data[i] = tmpCaptureData[i * 2];
+		}
+		CaptureDataTail->size = tmpCaptureFramesNum;
+		delete[]tmpCaptureData;
+		CaptureDataTail->next = new WaveData();
+		CaptureDataTail = CaptureDataTail->next;
+		LeaveCriticalSection(&criticalSection);
+	}
+	return S_OK;
+}
 
 HRESULT RenderThread()
 {
@@ -41,94 +97,92 @@ HRESULT RenderThread()
 		CLSID_MMDeviceEnumerator, NULL,
 		CLSCTX_ALL, IID_IMMDeviceEnumerator,
 		(void**)&pEnumerator);
-	EXIT_ON_ERROR(hr)
+	EXIT_ON_ERROR(hr);
 
-		hr = pEnumerator->GetDefaultAudioEndpoint(
-			eRender, eConsole, &pDevice);
-	EXIT_ON_ERROR(hr)
+	hr = pEnumerator->GetDefaultAudioEndpoint(
+		eRender, eConsole, &pDevice);
+	EXIT_ON_ERROR(hr);
 
-		hr = pDevice->Activate(
-			IID_IAudioClient, CLSCTX_ALL,
-			NULL, (void**)&pAudioClient);
-	EXIT_ON_ERROR(hr)
+	hr = pDevice->Activate(
+		IID_IAudioClient, CLSCTX_ALL,
+		NULL, (void**)&pAudioClient);
+	EXIT_ON_ERROR(hr);
 
-		hr = pAudioClient->GetMixFormat(&pwfx);
-	EXIT_ON_ERROR(hr)
+	hr = pAudioClient->GetMixFormat(&pwfx);
+	EXIT_ON_ERROR(hr);
 
-		hr = pAudioClient->Initialize(
-			AUDCLNT_SHAREMODE_SHARED,
-			0,
-			hnsRequestedDuration,
-			0,
-			pwfx,
-			NULL);
-	EXIT_ON_ERROR(hr)
+	hr = pAudioClient->Initialize(
+		AUDCLNT_SHAREMODE_SHARED,
+		0,
+		hnsRequestedDuration,
+		0,
+		pwfx,
+		NULL);
+	EXIT_ON_ERROR(hr);
 
-		// Tell the audio source which format to use.
-		//hr = pMySource->SetFormat(pwfx);
-		EXIT_ON_ERROR(hr)
+	// Tell the audio source which format to use.
+	//hr = pMySource->SetFormat(pwfx);
+	EXIT_ON_ERROR(hr);
 
-		// Get the actual size of the allocated buffer.
-		hr = pAudioClient->GetBufferSize(&bufferFrameCount);
-	EXIT_ON_ERROR(hr)
+	// Get the actual size of the allocated buffer.
+	hr = pAudioClient->GetBufferSize(&bufferFrameCount);
+	EXIT_ON_ERROR(hr);
 
-		hr = pAudioClient->GetService(
-			IID_IAudioRenderClient,
-			(void**)&pRenderClient);
-	EXIT_ON_ERROR(hr)
+	hr = pAudioClient->GetService(
+		IID_IAudioRenderClient,
+		(void**)&pRenderClient);
+	EXIT_ON_ERROR(hr);
 
-		// Grab the entire buffer for the initial fill operation.
-		hr = pRenderClient->GetBuffer(bufferFrameCount, &pData);
-	EXIT_ON_ERROR(hr)
+	// Grab the entire buffer for the initial fill operation.
+	hr = pRenderClient->GetBuffer(bufferFrameCount, &pData);
+	EXIT_ON_ERROR(hr);
 
-		// Load the initial data into the shared buffer.
-		//hr = pMySource->LoadData(bufferFrameCount, pData, &flags);
-		EXIT_ON_ERROR(hr)
+	// Load the initial data into the shared buffer.
+	LoadRenderData(pData, bufferFrameCount);
+	EXIT_ON_ERROR(hr);
 
-		hr = pRenderClient->ReleaseBuffer(bufferFrameCount, flags);
-	EXIT_ON_ERROR(hr)
+	hr = pRenderClient->ReleaseBuffer(bufferFrameCount, flags);
+	EXIT_ON_ERROR(hr);
 
-		// Calculate the actual duration of the allocated buffer.
-		hnsActualDuration = (double)REFTIMES_PER_SEC *
+	// Calculate the actual duration of the allocated buffer.
+	hnsActualDuration = (double)REFTIMES_PER_SEC *
 		bufferFrameCount / pwfx->nSamplesPerSec;
 
 	hr = pAudioClient->Start();  // Start playing.
-	EXIT_ON_ERROR(hr)
+	EXIT_ON_ERROR(hr);
 
-		// Each loop fills about half of the shared buffer.
-		while (flags != AUDCLNT_BUFFERFLAGS_SILENT)
-		{
-			// Sleep for half the buffer duration.
-			//Sleep((DWORD)(hnsActualDuration / REFTIMES_PER_MILLISEC / 2));
+	// Each loop fills about half of the shared buffer.
+	while (flags != AUDCLNT_BUFFERFLAGS_SILENT)
+	{
+		// Sleep for half the buffer duration.
+		//Sleep((DWORD)(hnsActualDuration / REFTIMES_PER_MILLISEC / 2));
 
-			// See how much buffer space is available.
-			hr = pAudioClient->GetCurrentPadding(&numFramesPadding);
-			EXIT_ON_ERROR(hr)
+		// See how much buffer space is available.
+		hr = pAudioClient->GetCurrentPadding(&numFramesPadding);
+		EXIT_ON_ERROR(hr);
 
-				numFramesAvailable = bufferFrameCount - numFramesPadding;
+		numFramesAvailable = bufferFrameCount - numFramesPadding;
 
-			// Grab all the available space in the shared buffer.
-			hr = pRenderClient->GetBuffer(numFramesAvailable, &pData);
-			printf("%d\t", numFramesAvailable);
-			EXIT_ON_ERROR(hr)
+		// Grab all the available space in the shared buffer.
+		hr = pRenderClient->GetBuffer(numFramesAvailable, &pData);
+		EXIT_ON_ERROR(hr);
 
-				// Get next 1/2-second of data from the audio source.
-				//hr = pMySource->LoadData(numFramesAvailable, pData, &flags);
-				EXIT_ON_ERROR(hr)
+		// Get next 1/2-second of data from the audio source.
+		LoadRenderData(pData, bufferFrameCount);
+		EXIT_ON_ERROR(hr);
 
-				hr = pRenderClient->ReleaseBuffer(numFramesAvailable, flags);
-			Sleep(10);
-			EXIT_ON_ERROR(hr)
-		}
+		hr = pRenderClient->ReleaseBuffer(numFramesAvailable, flags);
+		Sleep(10);
+		EXIT_ON_ERROR(hr);
+	}
 
 	// Wait for last data in buffer to play before stopping.
-	Sleep((DWORD)(hnsActualDuration / REFTIMES_PER_MILLISEC / 2));
+	//Sleep((DWORD)(hnsActualDuration / REFTIMES_PER_MILLISEC / 2));
 
 RenderStop:
 	hr = pAudioClient->Stop();  // Stop playing.
-	EXIT_ON_ERROR(hr)
+	EXIT_ON_ERROR(hr);
 
-		Exit:
 	CoTaskMemFree(pwfx);
 	SAFE_RELEASE(pEnumerator)
 		SAFE_RELEASE(pDevice)
@@ -155,94 +209,99 @@ HRESULT CaptureThread()
 	BYTE *pData;
 	DWORD flags;
 
+	HANDLE hEvent = CreateEvent(NULL, true, false, szSaveCaptureDataEvent);
+	HANDLE hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)SaveCaptureDataThread, NULL, 0, 0);
 	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 	hr = CoCreateInstance(
 		CLSID_MMDeviceEnumerator, NULL,
 		CLSCTX_ALL, IID_IMMDeviceEnumerator,
 		(void**)&pEnumerator);
-	EXIT_ON_ERROR(hr)
+	EXIT_ON_ERROR(hr);
 
-		hr = pEnumerator->GetDefaultAudioEndpoint(
-			eCapture, eConsole, &pDevice);
-	EXIT_ON_ERROR(hr)
+	hr = pEnumerator->GetDefaultAudioEndpoint(
+		eCapture, eConsole, &pDevice);
+	EXIT_ON_ERROR(hr);
 
-		hr = pDevice->Activate(
-			IID_IAudioClient, CLSCTX_ALL,
-			NULL, (void**)&pAudioClient);
-	EXIT_ON_ERROR(hr)
+	hr = pDevice->Activate(
+		IID_IAudioClient, CLSCTX_ALL,
+		NULL, (void**)&pAudioClient);
+	EXIT_ON_ERROR(hr);
 
-		hr = pAudioClient->GetMixFormat(&pwfx);
-	EXIT_ON_ERROR(hr)
+	hr = pAudioClient->GetMixFormat(&pwfx);
+	EXIT_ON_ERROR(hr);
 
-		hr = pAudioClient->Initialize(
-			AUDCLNT_SHAREMODE_SHARED,
-			0,
-			hnsRequestedDuration,
-			0,
-			pwfx,
-			NULL);
-	EXIT_ON_ERROR(hr)
+	hr = pAudioClient->Initialize(
+		AUDCLNT_SHAREMODE_SHARED,
+		0,
+		hnsRequestedDuration,
+		0,
+		pwfx,
+		NULL);
+	EXIT_ON_ERROR(hr);
 
-		// Get the size of the allocated buffer.
-		hr = pAudioClient->GetBufferSize(&bufferFrameCount);
-	EXIT_ON_ERROR(hr)
+	// Get the size of the allocated buffer.
+	hr = pAudioClient->GetBufferSize(&bufferFrameCount);
+	EXIT_ON_ERROR(hr);
 
-		hr = pAudioClient->GetService(
-			IID_IAudioCaptureClient,
-			(void**)&pCaptureClient);
-	EXIT_ON_ERROR(hr)
+	hr = pAudioClient->GetService(
+		IID_IAudioCaptureClient,
+		(void**)&pCaptureClient);
+	EXIT_ON_ERROR(hr);
 
-		// Notify the audio sink which format to use.
-		//hr = pMySink->SetFormat(pwfx);
-		EXIT_ON_ERROR(hr)
+	// Notify the audio sink which format to use.
+	//hr = pMySink->SetFormat(pwfx);
+	EXIT_ON_ERROR(hr);
 
-		// Calculate the actual duration of the allocated buffer.
-		hnsActualDuration = (double)REFTIMES_PER_SEC *
+	// Calculate the actual duration of the allocated buffer.
+	hnsActualDuration = (double)REFTIMES_PER_SEC *
 		bufferFrameCount / pwfx->nSamplesPerSec;
 
 	hr = pAudioClient->Start();  // Start recording.
-	EXIT_ON_ERROR(hr)
+	EXIT_ON_ERROR(hr);
 
-		// Each loop fills about half of the shared buffer.
-		while (bDone == FALSE)
+	// Each loop fills about half of the shared buffer.
+	while (bDone == FALSE)
+	{
+		// Sleep for half the buffer duration.
+		Sleep(10);
+
+		hr = pCaptureClient->GetNextPacketSize(&packetLength);
+		EXIT_ON_ERROR(hr);
+
+		while (packetLength != 0)
 		{
-			// Sleep for half the buffer duration.
-			Sleep(hnsActualDuration / REFTIMES_PER_MILLISEC / 2);
+			// Get the available data in the shared buffer.
+			hr = pCaptureClient->GetBuffer(
+				&pData,
+				&numFramesAvailable,
+				&flags, NULL, NULL);
+			EXIT_ON_ERROR(hr);
+
+			if (flags & AUDCLNT_BUFFERFLAGS_SILENT)
+			{
+				pData = NULL;  // Tell CopyData to write silence.
+			}
+
+			// Copy the available capture data to the audio sink.
+			EnterCriticalSection(&criticalSection);
+			tmpCaptureData = new float[numFramesAvailable * 2];
+			tmpCaptureFramesNum = numFramesAvailable;
+			CopyMemory(tmpCaptureData, pData, numFramesAvailable * 8);
+			LeaveCriticalSection(&criticalSection);
+			PulseEvent(hEvent);
+			EXIT_ON_ERROR(hr);
+
+			hr = pCaptureClient->ReleaseBuffer(numFramesAvailable);
+			EXIT_ON_ERROR(hr);
 
 			hr = pCaptureClient->GetNextPacketSize(&packetLength);
-			EXIT_ON_ERROR(hr)
-
-				while (packetLength != 0)
-				{
-					// Get the available data in the shared buffer.
-					hr = pCaptureClient->GetBuffer(
-						&pData,
-						&numFramesAvailable,
-						&flags, NULL, NULL);
-					EXIT_ON_ERROR(hr)
-
-						if (flags & AUDCLNT_BUFFERFLAGS_SILENT)
-						{
-							pData = NULL;  // Tell CopyData to write silence.
-						}
-
-					// Copy the available capture data to the audio sink.
-					//hr = pMySink->CopyData(
-					//pData, numFramesAvailable, &bDone);
-					EXIT_ON_ERROR(hr)
-
-						hr = pCaptureClient->ReleaseBuffer(numFramesAvailable);
-					EXIT_ON_ERROR(hr)
-
-						hr = pCaptureClient->GetNextPacketSize(&packetLength);
-					EXIT_ON_ERROR(hr)
-				}
+			EXIT_ON_ERROR(hr);
 		}
+	}
 CaptureStop:
 	hr = pAudioClient->Stop();  // Stop recording.
-	EXIT_ON_ERROR(hr)
+	EXIT_ON_ERROR(hr);
 
-		Exit:
 	CoTaskMemFree(pwfx);
 	SAFE_RELEASE(pEnumerator)
 		SAFE_RELEASE(pDevice)
@@ -254,8 +313,14 @@ CaptureStop:
 
 int main()
 {
+	RenderDataTail = new WaveData();
+	RenderDataQueue = RenderDataTail;
+	CaptureDataTail = new WaveData();
+	CaptureDataQueue = CaptureDataTail;
+	InitializeCriticalSection(&criticalSection);
+	
 	HANDLE hRenderThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)RenderThread, NULL, 0, 0);
-	HANDLE hCaptureTHread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, NULL, 0, 0);
+	HANDLE hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, NULL, 0, 0);
 
 	WaitForSingleObject(hRenderThread, INFINITE);
 	//‘∂∂À”Ô“Ù ˝æ›
@@ -339,5 +404,6 @@ int main()
 
 	//	int a = 0;
 	//}
+	DeleteCriticalSection(&criticalSection);
 	return 0;
 }
