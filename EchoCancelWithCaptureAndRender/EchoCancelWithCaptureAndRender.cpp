@@ -25,6 +25,7 @@ const IID IID_IAudioCaptureClient = __uuidof(IAudioCaptureClient);
 const TCHAR *szLoadRenderDataEvent = L"szLoadRenderDataEvent";
 const TCHAR *szSaveCaptureDataEvent = L"szSaveCaptureDataEvent";
 const TCHAR *szRenderThreadEvent = L"RenderThreadEvent";
+const TCHAR *szStopEvent = L"StopEvent";
 
 CRITICAL_SECTION criticalSection;
 
@@ -56,7 +57,100 @@ WaveData *CurrentRenderData;
 WaveData *RenderDataTail;
 WaveData *CaptureDataQueue;
 WaveData *CaptureDataTail;
+WaveData *OutputDataQueue;
+WaveData *OutputDataTail;
 
+//  Header for a WAV file - we define a structure describing the first few fields in the header for convenience.
+//
+struct WAVEHEADER
+{
+	DWORD   dwRiff;                     // "RIFF"
+	DWORD   dwSize;                     // Size
+	DWORD   dwWave;                     // "WAVE"
+	DWORD   dwFmt;                      // "fmt "
+	DWORD   dwFmtSize;                  // Wave Format Size
+};
+
+//  Static RIFF header, we'll append the format to it.
+const BYTE szWaveHeader[] =
+{
+	'R',   'I',   'F',   'F',  0x00,  0x00,  0x00,  0x00, 'W',   'A',   'V',   'E',   'f',   'm',   't',   ' ', 0x00, 0x00, 0x00, 0x00
+};
+
+//  Static wave DATA tag.
+const BYTE szWaveData[] = { 'd', 'a', 't', 'a' };
+
+LRESULT SaveToFile()
+{
+	HANDLE FileHandle = CreateFile(L"wave.wav", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS,
+		FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
+		NULL);
+	if (FileHandle != INVALID_HANDLE_VALUE)
+	{
+		DWORD waveFileSize = sizeof(WAVEHEADER) + sizeof(WAVEFORMATEX) + WaveFormat->cbSize + sizeof(szWaveData) + sizeof(DWORD) + static_cast<DWORD>(BufferSize);
+		BYTE *waveFileData = new (std::nothrow) BYTE[waveFileSize];
+		BYTE *waveFilePointer = waveFileData;
+		WAVEHEADER *waveHeader = reinterpret_cast<WAVEHEADER *>(waveFileData);
+
+		if (waveFileData == NULL)
+		{
+			printf("Unable to allocate %d bytes to hold output wave data\n", waveFileSize);
+			return false;
+		}
+
+		//
+		//  Copy in the wave header - we'll fix up the lengths later.
+		//
+		CopyMemory(waveFilePointer, szWaveHeader, sizeof(szWaveHeader));
+		waveFilePointer += sizeof(szWaveHeader);
+
+		//
+		//  Update the sizes in the header.
+		//
+		waveHeader->dwSize = waveFileSize - (2 * sizeof(DWORD));
+		waveHeader->dwFmtSize = sizeof(WAVEFORMATEX) + WaveFormat->cbSize;
+
+		//
+		//  Next copy in the WaveFormatex structure.
+		//
+		CopyMemory(waveFilePointer, WaveFormat, sizeof(WAVEFORMATEX) + WaveFormat->cbSize);
+		waveFilePointer += sizeof(WAVEFORMATEX) + WaveFormat->cbSize;
+
+
+		//
+		//  Then the data header.
+		//
+		CopyMemory(waveFilePointer, szWaveData, sizeof(szWaveData));
+		waveFilePointer += sizeof(szWaveData);
+		*(reinterpret_cast<DWORD *>(waveFilePointer)) = static_cast<DWORD>(BufferSize);
+		waveFilePointer += sizeof(DWORD);
+
+		//
+		//  And finally copy in the audio data.
+		//
+		CopyMemory(waveFilePointer, Buffer, BufferSize);
+
+		//
+		//  Last but not least, write the data to the file.
+		//
+		DWORD bytesWritten;
+		if (!WriteFile(FileHandle, waveFileData, waveFileSize, &bytesWritten, NULL))
+		{
+			printf("Unable to write wave file: %d\n", GetLastError());
+			delete[]waveFileData;
+			return false;
+		}
+
+		if (bytesWritten != waveFileSize)
+		{
+			printf("Failed to write entire wave file\n");
+			delete[]waveFileData;
+			return false;
+		}
+		delete[]waveFileData;
+	}
+	return S_OK;
+}
 
 HRESULT LoadRenderDataThread()
 {
@@ -127,7 +221,7 @@ HRESULT RenderThread()
 	DWORD flags = 0;
 
 	HANDLE hEvent = CreateEvent(NULL, true, false, szLoadRenderDataEvent);
-	HANDLE hRenderEvent = CreateEvent(NULL, true, false,szRenderThreadEvent);
+	HANDLE hRenderEvent = CreateEvent(NULL, true, false, szRenderThreadEvent);
 	HANDLE hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)LoadRenderDataThread, NULL, 0, 0);
 
 	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
@@ -350,53 +444,121 @@ CaptureStop:
 
 LRESULT ProcessThread()
 {
+	HANDLE hStopEvent = OpenEvent(EVENT_ALL_ACCESS, false, szStopEvent);
 BeginProcess:
-	while (RenderDataQueue->next != nullptr && CaptureDataQueue->next != nullptr)
+	int iter = 20;
+	float *nearEnd_f = new float[audioLength5s + iter];
+	float *farEnd_f = new float[audioLength5s + iter];
+	for (int i = 0; i < iter; i++)
 	{
-		float *nearEnd_f = new float[audioLength5s];
-		float *farEnd_f = new float[audioLength5s];
-		emxArray_real32_T  *farEnd;
-		emxArray_real32_T  *nearEnd;
-		emxArray_real32_T *echo, *m, *en;
+		nearEnd_f[i] = 0;
+		farEnd_f[i] = 0;
+	}
+	emxArray_real32_T  *farEnd;
+	emxArray_real32_T  *nearEnd;
+	emxArray_real32_T *echo, *m, *en;
+ContinueProcess:
+	EnterCriticalSection(&criticalSection);
+	if (RenderDataQueue->next != nullptr && CaptureDataQueue->next != nullptr)
+	{
 
+		//TODO ¸üÐÂÖ¸Õë
 		while (captureProcessDataNum < audioLength5s)
 		{
 			int copySize = 0;
-			memcpy(nearEnd_f + captureProcessDataNum, CaptureDataQueue->data + captureProcessPosition, copySize = sizeof(float) * min(CaptureDataQueue->size, audioLength5s - captureProcessDataNum));
+			memcpy(nearEnd_f + iter + captureProcessDataNum, CaptureDataQueue->data + captureProcessPosition, copySize = sizeof(float) * min(CaptureDataQueue->size, audioLength5s - captureProcessDataNum));
 			if (copySize < CaptureDataQueue->size)
 				captureProcessPosition = copySize;
 			else
 				captureProcessPosition = 0;
 
 			captureProcessDataNum += copySize;
+			if (CaptureDataQueue->next != nullptr)
+				CaptureDataQueue = CaptureDataQueue->next;
+			else
+			{
+				LeaveCriticalSection(&criticalSection);
+				goto ContinueProcess;
+			}
 		}
 
 		while (renderProcessDataNum < audioLength5s)
 		{
 			int copySize = 0;
-			memcpy(farEnd_f + renderProcessDataNum, RenderDataQueue->data + renderProcessPosition, copySize = sizeof(float)*min(RenderDataQueue->size, audioLength5s - renderProcessDataNum));
+			memcpy(farEnd_f + iter + renderProcessDataNum, RenderDataQueue->data + renderProcessPosition, copySize = sizeof(float)*min(RenderDataQueue->size, audioLength5s - renderProcessDataNum));
 			if (copySize < RenderDataQueue->size)
 				renderProcessPosition = copySize;
 			else
 				renderProcessPosition = 0;
-			
-			renderProcessPosition += copySize;
+
+			renderProcessDataNum += copySize;
+			if (RenderDataQueue->next != nullptr)
+				RenderDataQueue = RenderDataQueue->next;
+			else
+			{
+				LeaveCriticalSection(&criticalSection);
+				goto ContinueProcess;
+			}
 		}
-
-
-		farEnd = emxCreateWrapper_real32_T(farEnd_f, audioLength5s, 1);
-		nearEnd = emxCreateWrapper_real32_T(nearEnd_f, audioLength5s, 1);
-		int delay = delayEstimation(farEnd, nearEnd);
-		float *echo_f = new float[audioLength5s];
-		echo = emxCreateWrapper_real32_T(echo_f, audioLength5s, 1);
-		m = emxCreateWrapper_real32_T(echo_f, 20, 1);
-		en = emxCreateWrapper_real32_T(echo_f, audioLength5s, 1);
-
-		NLMS(nearEnd, farEnd, 20, 1, 0, echo, m, en);
+		LeaveCriticalSection(&criticalSection);
 	}
-	Sleep(100);
+	else
+	{
+		LeaveCriticalSection(&criticalSection);
+		Sleep(100);
+		goto ContinueProcess;
+	}
+	captureProcessDataNum = 0;
+	renderProcessDataNum = 0;
+	farEnd = emxCreateWrapper_real32_T(farEnd_f, audioLength5s + iter, 1);
+	nearEnd = emxCreateWrapper_real32_T(nearEnd_f, audioLength5s + iter, 1);
+	int delay = delayEstimation(farEnd, nearEnd);
+	emxDestroyArray_real32_T(farEnd);
+	emxDestroyArray_real32_T(nearEnd);
+	farEnd = emxCreateWrapper_real32_T(farEnd_f, 1, audioLength5s + iter);
+	nearEnd = emxCreateWrapper_real32_T(nearEnd_f, 1, audioLength5s + iter);
+	float *echo_f = new float[audioLength5s + iter];
+	echo = emxCreateWrapper_real32_T(echo_f, 1, audioLength5s + iter);
+	m = emxCreateWrapper_real32_T(echo_f, 1, iter);
+	en = emxCreateWrapper_real32_T(echo_f, audioLength5s + iter, 1);
+
+	NLMS(nearEnd, farEnd, iter, 1, 0, echo, m, en);
+	
+	EnterCriticalSection(&criticalSection);
+	OutputDataTail->size = audioLength5s;
+	OutputDataTail->data = new float[audioLength5s];
+	for (int i = 0; i < audioLength5s; i++)
+	{
+		OutputDataTail->data[i] = nearEnd_f[i + iter] - echo_f[i + iter];
+	}
+	OutputDataTail->next = new WaveData();
+	OutputDataTail = OutputDataTail->next;
+	LeaveCriticalSection(&criticalSection);
+
+	delete[]farEnd_f;
+	delete[]nearEnd_f;
+	DWORD flag = WaitForSingleObject(hStopEvent, 100);
+	switch (flag)
+	{
+	case WAIT_OBJECT_0:
+		SaveToFile();
+		return S_OK;
+		break;
+	case WAIT_TIMEOUT:
+		goto BeginProcess;
+		break;
+	}
+	//Sleep(100);
 	goto BeginProcess;
 	return S_OK;
+}
+
+void Stop()
+{
+	char ch;
+	scanf("%c", &ch);
+	HANDLE hStopEvent = OpenEvent(EVENT_ALL_ACCESS, false, szStopEvent);
+	SetEvent(hStopEvent);
 }
 
 int main()
@@ -414,12 +576,18 @@ int main()
 	CaptureDataTail = new WaveData();
 	CaptureDataQueue = CaptureDataTail;
 	CurrentRenderData = CaptureDataQueue;
+
+	OutputDataTail = new WaveData();
+	OutputDataQueue = OutputDataTail;
 	InitializeCriticalSection(&criticalSection);
+	CreateEvent(NULL, true, false, szStopEvent);
 
 	HANDLE hRenderThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)RenderThread, NULL, 0, 0);
 	HANDLE hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, NULL, 0, 0);
+	HANDLE hProcessThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ProcessThread, NULL, 0, 0);
+	HANDLE hStopThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Stop, NULL, 0, 0);
 
-	WaitForSingleObject(hRenderThread, INFINITE);
+	WaitForSingleObject(hProcessThread, INFINITE);
 
 	DeleteCriticalSection(&criticalSection);
 	return 0;
