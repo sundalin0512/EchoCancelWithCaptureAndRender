@@ -2,9 +2,11 @@
 //
 
 #include "stdafx.h"
-
+#include <vector>
 #include "../AEC/delayEstimation/delayEstimation.h"
 #include "../AEC/delayEstimation/delayEstimation_emxAPI.h"
+
+using namespace std;
 
 const int ciFrameSize = 480;
 const int REFTIMES_PER_SEC = 10000000;
@@ -25,9 +27,12 @@ const IID IID_IAudioCaptureClient = __uuidof(IAudioCaptureClient);
 const TCHAR *szLoadRenderDataEvent = L"szLoadRenderDataEvent";
 const TCHAR *szSaveCaptureDataEvent = L"szSaveCaptureDataEvent";
 const TCHAR *szRenderThreadEvent = L"RenderThreadEvent";
-const TCHAR *szStopEvent = L"StopEvent";
+//const TCHAR *szStopEvent = L"StopEvent";
+bool StopFlag = false;
 
 CRITICAL_SECTION criticalSection;
+
+WAVEFORMATEX *WaveFormat;
 
 class WaveData
 {
@@ -82,11 +87,18 @@ const BYTE szWaveData[] = { 'd', 'a', 't', 'a' };
 
 LRESULT SaveToFile()
 {
-	HANDLE FileHandle = CreateFile(L"wave.wav", GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS,
-		FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
-		NULL);
-	if (FileHandle != INVALID_HANDLE_VALUE)
+	FILE *fp = fopen("wwwave.wav", "wb");
+	if (fp)
 	{
+		vector<float> Buffer;
+		size_t BufferSize = 0;
+		while (OutputDataQueue->next != nullptr)
+		{
+			BufferSize += OutputDataQueue->size;
+			Buffer.insert(Buffer.end(), OutputDataQueue->data, OutputDataQueue->data + OutputDataQueue->size);
+			OutputDataQueue = OutputDataQueue->next;
+		}
+		BufferSize *= sizeof(float);
 		DWORD waveFileSize = sizeof(WAVEHEADER) + sizeof(WAVEFORMATEX) + WaveFormat->cbSize + sizeof(szWaveData) + sizeof(DWORD) + static_cast<DWORD>(BufferSize);
 		BYTE *waveFileData = new (std::nothrow) BYTE[waveFileSize];
 		BYTE *waveFilePointer = waveFileData;
@@ -128,13 +140,13 @@ LRESULT SaveToFile()
 		//
 		//  And finally copy in the audio data.
 		//
-		CopyMemory(waveFilePointer, Buffer, BufferSize);
+		CopyMemory(waveFilePointer, Buffer.data(), BufferSize);
 
 		//
 		//  Last but not least, write the data to the file.
 		//
 		DWORD bytesWritten;
-		if (!WriteFile(FileHandle, waveFileData, waveFileSize, &bytesWritten, NULL))
+		if (bytesWritten = fwrite(waveFileData, waveFileSize, sizeof(BYTE), fp))
 		{
 			printf("Unable to write wave file: %d\n", GetLastError());
 			delete[]waveFileData;
@@ -148,6 +160,7 @@ LRESULT SaveToFile()
 			return false;
 		}
 		delete[]waveFileData;
+		fclose(fp);
 	}
 	return S_OK;
 }
@@ -158,6 +171,8 @@ HRESULT LoadRenderDataThread()
 	HANDLE hRenderEvent = OpenEvent(EVENT_ALL_ACCESS, false, szRenderThreadEvent);
 	while (true)
 	{
+		if (StopFlag)
+			return S_OK;
 		WaitForSingleObject(hEvent, INFINITE);
 		EnterCriticalSection(&criticalSection);
 		static int position = 0;
@@ -179,6 +194,7 @@ HRESULT LoadRenderDataThread()
 		PulseEvent(hRenderEvent);
 		//tmpRenderFramesNum = 20000;
 		LeaveCriticalSection(&criticalSection);
+
 	}
 	return S_OK;
 }
@@ -188,6 +204,8 @@ HRESULT SaveCaptureDataThread()
 	HANDLE hEvent = OpenEvent(EVENT_ALL_ACCESS, false, szSaveCaptureDataEvent);
 	while (true)
 	{
+		if (StopFlag)
+			return S_OK;
 		WaitForSingleObject(hEvent, INFINITE);
 		EnterCriticalSection(&criticalSection);
 		CaptureDataTail->data = new float[tmpCaptureFramesNum];
@@ -201,6 +219,7 @@ HRESULT SaveCaptureDataThread()
 		//尾节点不包含数据
 		CaptureDataTail = CaptureDataTail->next;
 		LeaveCriticalSection(&criticalSection);
+
 	}
 	return S_OK;
 }
@@ -311,6 +330,10 @@ HRESULT RenderThread()
 		EXIT_ON_ERROR(hr);
 
 		hr = pRenderClient->ReleaseBuffer(numFramesAvailable, flags);
+		if (StopFlag)
+		{
+			goto RenderStop;
+		}
 		Sleep(500);
 		EXIT_ON_ERROR(hr);
 	}
@@ -372,6 +395,7 @@ HRESULT CaptureThread()
 		0,
 		pwfx,
 		NULL);
+	WaveFormat = new WAVEFORMATEX(*pwfx);
 	EXIT_ON_ERROR(hr);
 
 	// Get the size of the allocated buffer.
@@ -394,6 +418,10 @@ HRESULT CaptureThread()
 	while (bDone == FALSE)
 	{
 		// Sleep for half the buffer duration.
+		if (StopFlag)
+		{
+			goto CaptureStop;
+		}
 		Sleep(1);
 
 		hr = pCaptureClient->GetNextPacketSize(&packetLength);
@@ -444,7 +472,6 @@ CaptureStop:
 
 LRESULT ProcessThread()
 {
-	HANDLE hStopEvent = OpenEvent(EVENT_ALL_ACCESS, false, szStopEvent);
 BeginProcess:
 	int iter = 20;
 	float *nearEnd_f = new float[audioLength5s + iter];
@@ -458,6 +485,8 @@ BeginProcess:
 	emxArray_real32_T  *nearEnd;
 	emxArray_real32_T *echo, *m, *en;
 ContinueProcess:
+	if (StopFlag)
+		goto StopProcess;
 	EnterCriticalSection(&criticalSection);
 	if (RenderDataQueue->next != nullptr && CaptureDataQueue->next != nullptr)
 	{
@@ -523,7 +552,7 @@ ContinueProcess:
 	en = emxCreateWrapper_real32_T(echo_f, audioLength5s + iter, 1);
 
 	NLMS(nearEnd, farEnd, iter, 1, 0, echo, m, en);
-	
+
 	EnterCriticalSection(&criticalSection);
 	OutputDataTail->size = audioLength5s;
 	OutputDataTail->data = new float[audioLength5s];
@@ -534,21 +563,14 @@ ContinueProcess:
 	OutputDataTail->next = new WaveData();
 	OutputDataTail = OutputDataTail->next;
 	LeaveCriticalSection(&criticalSection);
-
+StopProcess:
 	delete[]farEnd_f;
 	delete[]nearEnd_f;
-	DWORD flag = WaitForSingleObject(hStopEvent, 100);
-	switch (flag)
+	if (StopFlag)
 	{
-	case WAIT_OBJECT_0:
 		SaveToFile();
 		return S_OK;
-		break;
-	case WAIT_TIMEOUT:
-		goto BeginProcess;
-		break;
 	}
-	//Sleep(100);
 	goto BeginProcess;
 	return S_OK;
 }
@@ -557,8 +579,7 @@ void Stop()
 {
 	char ch;
 	scanf("%c", &ch);
-	HANDLE hStopEvent = OpenEvent(EVENT_ALL_ACCESS, false, szStopEvent);
-	SetEvent(hStopEvent);
+	StopFlag = true;
 }
 
 int main()
@@ -580,7 +601,6 @@ int main()
 	OutputDataTail = new WaveData();
 	OutputDataQueue = OutputDataTail;
 	InitializeCriticalSection(&criticalSection);
-	CreateEvent(NULL, true, false, szStopEvent);
 
 	HANDLE hRenderThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)RenderThread, NULL, 0, 0);
 	HANDLE hCaptureThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CaptureThread, NULL, 0, 0);
