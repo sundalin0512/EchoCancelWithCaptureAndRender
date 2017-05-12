@@ -87,7 +87,7 @@ const BYTE szWaveData[] = { 'd', 'a', 't', 'a' };
 
 LRESULT SaveToFile()
 {
-	FILE *fp = fopen("wwwave.wav", "wb");
+	FILE *fp = fopen("waveabc.bin", "wb");
 	if (fp)
 	{
 		vector<float> Buffer;
@@ -146,19 +146,19 @@ LRESULT SaveToFile()
 		//  Last but not least, write the data to the file.
 		//
 		DWORD bytesWritten;
-		if (bytesWritten = fwrite(waveFileData, waveFileSize, sizeof(BYTE), fp))
+		if (!(bytesWritten = fwrite(waveFileData, sizeof(BYTE), waveFileSize , fp)))
 		{
 			printf("Unable to write wave file: %d\n", GetLastError());
 			delete[]waveFileData;
 			return false;
 		}
 
-		if (bytesWritten != waveFileSize)
-		{
-			printf("Failed to write entire wave file\n");
-			delete[]waveFileData;
-			return false;
-		}
+		//if (bytesWritten != waveFileSize)
+		//{
+		//	printf("Failed to write entire wave file\n");
+		//	delete[]waveFileData;
+		//	return false;
+		//}
 		delete[]waveFileData;
 		fclose(fp);
 	}
@@ -555,10 +555,11 @@ ContinueProcess:
 
 	EnterCriticalSection(&criticalSection);
 	OutputDataTail->size = audioLength5s;
-	OutputDataTail->data = new float[audioLength5s];
+	OutputDataTail->data = new float[audioLength5s*2];
 	for (int i = 0; i < audioLength5s; i++)
 	{
-		OutputDataTail->data[i] = nearEnd_f[i + iter] - echo_f[i + iter];
+		OutputDataTail->data[i * 2] = nearEnd_f[i + iter] - echo_f[i + iter];
+		OutputDataTail->data[i * 2 + 1] = OutputDataTail->data[i * 2];
 	}
 	OutputDataTail->next = new WaveData();
 	OutputDataTail = OutputDataTail->next;
@@ -568,7 +569,7 @@ StopProcess:
 	delete[]nearEnd_f;
 	if (StopFlag)
 	{
-		SaveToFile();
+		//SaveToFile();
 		return S_OK;
 	}
 	goto BeginProcess;
@@ -608,7 +609,10 @@ int main()
 	HANDLE hStopThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Stop, NULL, 0, 0);
 
 	WaitForSingleObject(hProcessThread, INFINITE);
-
+	SaveToFile();
+	Sleep(100);
 	DeleteCriticalSection(&criticalSection);
+
+	
 	return 0;
 }
