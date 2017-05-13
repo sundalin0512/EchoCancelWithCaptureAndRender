@@ -208,6 +208,9 @@ HRESULT SaveCaptureDataThread()
 			return S_OK;
 		WaitForSingleObject(hEvent, INFINITE);
 		EnterCriticalSection(&criticalSection);
+		CaptureDataTail->next = new WaveData();
+		//首节点不包含数据
+		CaptureDataTail = CaptureDataTail->next;
 		CaptureDataTail->data = new float[tmpCaptureFramesNum];
 		for (int i = 0; i < tmpCaptureFramesNum; i++)
 		{
@@ -215,9 +218,7 @@ HRESULT SaveCaptureDataThread()
 		}
 		CaptureDataTail->size = tmpCaptureFramesNum;
 		delete[]tmpCaptureData;
-		CaptureDataTail->next = new WaveData();
-		//尾节点不包含数据
-		CaptureDataTail = CaptureDataTail->next;
+		
 		LeaveCriticalSection(&criticalSection);
 
 	}
@@ -388,6 +389,9 @@ HRESULT CaptureThread()
 	hr = pAudioClient->GetMixFormat(&pwfx);
 	EXIT_ON_ERROR(hr);
 
+	hr = pAudioClient->GetMixFormat(&WaveFormat);
+	EXIT_ON_ERROR(hr);
+
 	hr = pAudioClient->Initialize(
 		AUDCLNT_SHAREMODE_SHARED,
 		0,
@@ -395,7 +399,6 @@ HRESULT CaptureThread()
 		0,
 		pwfx,
 		NULL);
-	WaveFormat = new WAVEFORMATEX(*pwfx);
 	EXIT_ON_ERROR(hr);
 
 	// Get the size of the allocated buffer.
@@ -492,16 +495,9 @@ ContinueProcess:
 	{
 
 		//TODO 更新指针
+		
 		while (captureProcessDataNum < audioLength5s)
 		{
-			int copySize = 0;
-			memcpy(nearEnd_f + iter + captureProcessDataNum, CaptureDataQueue->data + captureProcessPosition, copySize = sizeof(float) * min(CaptureDataQueue->size, audioLength5s - captureProcessDataNum));
-			if (copySize < CaptureDataQueue->size)
-				captureProcessPosition = copySize;
-			else
-				captureProcessPosition = 0;
-
-			captureProcessDataNum += copySize;
 			if (CaptureDataQueue->next != nullptr)
 				CaptureDataQueue = CaptureDataQueue->next;
 			else
@@ -509,18 +505,20 @@ ContinueProcess:
 				LeaveCriticalSection(&criticalSection);
 				goto ContinueProcess;
 			}
+			int copySize = 0;
+			memcpy(nearEnd_f + iter + captureProcessDataNum, CaptureDataQueue->data + captureProcessPosition, copySize = sizeof(float) * min(CaptureDataQueue->size - captureProcessPosition, audioLength5s - captureProcessDataNum));
+			copySize /= 4;
+			if (copySize < CaptureDataQueue->size - captureProcessPosition)
+				captureProcessPosition += copySize;
+			else
+				captureProcessPosition = 0;
+
+			captureProcessDataNum += copySize;
+			
 		}
 
 		while (renderProcessDataNum < audioLength5s)
 		{
-			int copySize = 0;
-			memcpy(farEnd_f + iter + renderProcessDataNum, RenderDataQueue->data + renderProcessPosition, copySize = sizeof(float)*min(RenderDataQueue->size, audioLength5s - renderProcessDataNum));
-			if (copySize < RenderDataQueue->size)
-				renderProcessPosition = copySize;
-			else
-				renderProcessPosition = 0;
-
-			renderProcessDataNum += copySize;
 			if (RenderDataQueue->next != nullptr)
 				RenderDataQueue = RenderDataQueue->next;
 			else
@@ -528,6 +526,16 @@ ContinueProcess:
 				LeaveCriticalSection(&criticalSection);
 				goto ContinueProcess;
 			}
+			int copySize = 0;
+			memcpy(farEnd_f + iter + renderProcessDataNum, RenderDataQueue->data + renderProcessPosition, copySize = sizeof(float)*min(RenderDataQueue->size - renderProcessPosition, audioLength5s - renderProcessDataNum));
+			copySize /= 4;
+			if (copySize < RenderDataQueue->size - renderProcessPosition)
+				renderProcessPosition += copySize;
+			else
+				renderProcessPosition = 0;
+
+			renderProcessDataNum += copySize;
+			
 		}
 		LeaveCriticalSection(&criticalSection);
 	}
@@ -558,7 +566,7 @@ ContinueProcess:
 	OutputDataTail->data = new float[audioLength5s*2];
 	for (int i = 0; i < audioLength5s; i++)
 	{
-		OutputDataTail->data[i * 2] = nearEnd_f[i + iter] - echo_f[i + iter];
+		OutputDataTail->data[i * 2] = nearEnd_f[i + iter];// -echo_f[i + iter];
 		OutputDataTail->data[i * 2 + 1] = OutputDataTail->data[i * 2];
 	}
 	OutputDataTail->next = new WaveData();
@@ -585,19 +593,12 @@ void Stop()
 
 int main()
 {
-	RenderDataTail = new WaveData();
+	CaptureDataTail = new WaveData();
+
+	CaptureDataQueue = CaptureDataTail;
+	RenderDataTail = CaptureDataQueue;
 	RenderDataQueue = RenderDataTail;
 	CurrentRenderData = RenderDataTail;
-	RenderDataTail->next = RenderDataTail;
-	RenderDataTail->data = new float[2000];
-	for (int i = 0; i < 2000; i++)
-	{
-		RenderDataTail->data[i] = (rand() % 100) / (float)500;
-	}
-	RenderDataTail->size = 2000;
-	CaptureDataTail = new WaveData();
-	CaptureDataQueue = CaptureDataTail;
-	CurrentRenderData = CaptureDataQueue;
 
 	OutputDataTail = new WaveData();
 	OutputDataQueue = OutputDataTail;
