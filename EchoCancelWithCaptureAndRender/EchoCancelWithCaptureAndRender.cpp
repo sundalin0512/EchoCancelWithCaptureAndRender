@@ -12,6 +12,10 @@ const int ciFrameSize = 480;
 const int REFTIMES_PER_SEC = 10000000;
 const int REFTIMES_PER_MILLISEC = 10000;
 const int audioLength5s = 240000;
+const int audioLength1s = 48000;
+const int audioLength500ms = 24000;
+const int audioLength200ms = 9600;
+const int audioLength100ms = 4800;
 
 int renderProcessDataNum = 0;
 int captureProcessDataNum = 0;
@@ -146,7 +150,7 @@ LRESULT SaveToFile()
 		//  Last but not least, write the data to the file.
 		//
 		DWORD bytesWritten;
-		if (!(bytesWritten = fwrite(waveFileData, sizeof(BYTE), waveFileSize , fp)))
+		if (!(bytesWritten = fwrite(waveFileData, sizeof(BYTE), waveFileSize, fp)))
 		{
 			printf("Unable to write wave file: %d\n", GetLastError());
 			delete[]waveFileData;
@@ -172,7 +176,7 @@ HRESULT LoadRenderDataThread()
 	while (true)
 	{
 		if (StopFlag)
-			return S_OK;
+			goto StopLoadData;
 		WaitForSingleObject(hEvent, INFINITE);
 		EnterCriticalSection(&criticalSection);
 		static int position = 0;
@@ -196,6 +200,7 @@ HRESULT LoadRenderDataThread()
 		LeaveCriticalSection(&criticalSection);
 
 	}
+StopLoadData:
 	return S_OK;
 }
 
@@ -218,7 +223,7 @@ HRESULT SaveCaptureDataThread()
 		}
 		CaptureDataTail->size = tmpCaptureFramesNum;
 		delete[]tmpCaptureData;
-		
+
 		LeaveCriticalSection(&criticalSection);
 
 	}
@@ -495,7 +500,7 @@ ContinueProcess:
 	{
 
 		//TODO ¸üÐÂÖ¸Õë
-		
+
 		while (captureProcessDataNum < audioLength5s)
 		{
 			if (CaptureDataQueue->next != nullptr)
@@ -514,7 +519,7 @@ ContinueProcess:
 				captureProcessPosition = 0;
 
 			captureProcessDataNum += copySize;
-			
+
 		}
 
 		while (renderProcessDataNum < audioLength5s)
@@ -535,7 +540,7 @@ ContinueProcess:
 				renderProcessPosition = 0;
 
 			renderProcessDataNum += copySize;
-			
+
 		}
 		LeaveCriticalSection(&criticalSection);
 	}
@@ -563,10 +568,10 @@ ContinueProcess:
 
 	EnterCriticalSection(&criticalSection);
 	OutputDataTail->size = audioLength5s;
-	OutputDataTail->data = new float[audioLength5s*2];
+	OutputDataTail->data = new float[audioLength5s * 2];
 	for (int i = 0; i < audioLength5s; i++)
 	{
-		OutputDataTail->data[i * 2] = nearEnd_f[i + iter];// -echo_f[i + iter];
+		OutputDataTail->data[i * 2] = nearEnd_f[i + iter] - echo_f[i + iter];
 		OutputDataTail->data[i * 2 + 1] = OutputDataTail->data[i * 2];
 	}
 	OutputDataTail->next = new WaveData();
@@ -591,17 +596,47 @@ void Stop()
 	StopFlag = true;
 }
 
+
+void LoadFromFile()
+{
+	FILE *fp_far = fopen("farEnd.wav", "rb");
+	short *far_frame = new short[44];
+	fread(far_frame, sizeof(char), 44, fp_far);
+	long fileBegin = ftell(fp_far);
+	delete[]far_frame;
+	fseek(fp_far, 0, SEEK_END);
+	long fileEnd = ftell(fp_far);
+	int fileLength = (fileEnd - fileBegin) / 2;
+	far_frame = new short[audioLength100ms];
+	fseek(fp_far, 44, SEEK_SET);
+	while (!feof(fp_far))
+	{
+		RenderDataTail->next = new WaveData();
+		RenderDataTail = RenderDataTail->next;
+		fread(far_frame, sizeof(short), audioLength100ms, fp_far);
+		RenderDataTail->size = audioLength100ms;
+		float *fTmp = new float[audioLength100ms];
+		for (int i = 0; i < audioLength100ms; i++)
+		{
+			fTmp[i] = far_frame[i] / float(65536 / 2);
+		}
+		RenderDataTail->data = fTmp;
+	}
+	fclose(fp_far);
+}
 int main()
 {
 	CaptureDataTail = new WaveData();
 
 	CaptureDataQueue = CaptureDataTail;
-	RenderDataTail = CaptureDataQueue;
+	//RenderDataTail = CaptureDataQueue;
+	RenderDataTail = new WaveData();
 	RenderDataQueue = RenderDataTail;
 	CurrentRenderData = RenderDataTail;
 
 	OutputDataTail = new WaveData();
 	OutputDataQueue = OutputDataTail;
+	LoadFromFile();
 	InitializeCriticalSection(&criticalSection);
 
 	HANDLE hRenderThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)RenderThread, NULL, 0, 0);
@@ -614,6 +649,6 @@ int main()
 	Sleep(100);
 	DeleteCriticalSection(&criticalSection);
 
-	
+
 	return 0;
 }
