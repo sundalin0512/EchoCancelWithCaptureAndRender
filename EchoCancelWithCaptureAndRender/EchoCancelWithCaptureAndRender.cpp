@@ -91,7 +91,7 @@ const BYTE szWaveData[] = { 'd', 'a', 't', 'a' };
 
 LRESULT SaveToFile()
 {
-	FILE *fp = fopen("waveabc.bin", "wb");
+	FILE *fp = fopen("out.wav", "wb");
 	if (fp)
 	{
 		vector<float> Buffer;
@@ -480,14 +480,17 @@ CaptureStop:
 
 LRESULT ProcessThread()
 {
-BeginProcess:
+
+
 	int iter = 20;
 	float *nearEnd_f = new float[audioLength5s + iter];
-	float *farEnd_f = new float[audioLength5s + iter];
+	float *farEnd_new = new float[audioLength5s + iter];
+	float *farEnd_old = new float[audioLength5s + iter];
+BeginProcess:
 	for (int i = 0; i < iter; i++)
 	{
 		nearEnd_f[i] = 0;
-		farEnd_f[i] = 0;
+		farEnd_new[i] = 0;
 	}
 	emxArray_real32_T  *farEnd;
 	emxArray_real32_T  *nearEnd;
@@ -532,7 +535,7 @@ ContinueProcess:
 				goto ContinueProcess;
 			}
 			int copySize = 0;
-			memcpy(farEnd_f + iter + renderProcessDataNum, RenderDataQueue->data + renderProcessPosition, copySize = sizeof(float)*min(RenderDataQueue->size - renderProcessPosition, audioLength5s - renderProcessDataNum));
+			memcpy(farEnd_new + iter + renderProcessDataNum, RenderDataQueue->data + renderProcessPosition, copySize = sizeof(float)*min(RenderDataQueue->size - renderProcessPosition, audioLength5s - renderProcessDataNum));
 			copySize /= 4;
 			if (copySize < RenderDataQueue->size - renderProcessPosition)
 				renderProcessPosition += copySize;
@@ -552,19 +555,27 @@ ContinueProcess:
 	}
 	captureProcessDataNum = 0;
 	renderProcessDataNum = 0;
-	farEnd = emxCreateWrapper_real32_T(farEnd_f, audioLength5s + iter, 1);
+	farEnd = emxCreateWrapper_real32_T(farEnd_new, audioLength5s + iter, 1);
 	nearEnd = emxCreateWrapper_real32_T(nearEnd_f, audioLength5s + iter, 1);
 	int delay = delayEstimation(farEnd, nearEnd);
 	emxDestroyArray_real32_T(farEnd);
 	emxDestroyArray_real32_T(nearEnd);
-	farEnd = emxCreateWrapper_real32_T(farEnd_f, 1, audioLength5s + iter);
-	nearEnd = emxCreateWrapper_real32_T(nearEnd_f, 1, audioLength5s + iter);
+	float *farEnd_tmp = new float[audioLength5s + iter];
 	float *echo_f = new float[audioLength5s + iter];
-	echo = emxCreateWrapper_real32_T(echo_f, 1, audioLength5s + iter);
-	m = emxCreateWrapper_real32_T(echo_f, 1, iter);
-	en = emxCreateWrapper_real32_T(echo_f, audioLength5s + iter, 1);
+	ZeroMemory(echo_f, sizeof(float)*(audioLength5s + iter));
+	if(delay>0)
+	{
+		CopyMemory(farEnd_tmp, farEnd_old + audioLength5s + iter - delay, delay * sizeof(float));
+		CopyMemory(farEnd_tmp + delay, farEnd_new, sizeof(float)*(audioLength5s + iter - delay));
+		farEnd = emxCreateWrapper_real32_T(farEnd_tmp, 1, audioLength5s + iter);
+		nearEnd = emxCreateWrapper_real32_T(nearEnd_f, 1, audioLength5s + iter);
+		
+		echo = emxCreateWrapper_real32_T(echo_f, 1, audioLength5s + iter);
+		m = emxCreateWrapper_real32_T(echo_f, 1, iter);
+		en = emxCreateWrapper_real32_T(echo_f, audioLength5s + iter, 1);
 
-	NLMS(nearEnd, farEnd, iter, 1, 0, echo, m, en);
+		NLMS(nearEnd, farEnd, iter, 1, 0, echo, m, en);
+	}
 
 	EnterCriticalSection(&criticalSection);
 	OutputDataTail->size = audioLength5s;
@@ -576,15 +587,20 @@ ContinueProcess:
 	}
 	OutputDataTail->next = new WaveData();
 	OutputDataTail = OutputDataTail->next;
+
 	LeaveCriticalSection(&criticalSection);
+	CopyMemory(farEnd_old, farEnd_new, sizeof(float)*(audioLength5s + iter));
 StopProcess:
-	delete[]farEnd_f;
-	delete[]nearEnd_f;
+
 	if (StopFlag)
 	{
 		//SaveToFile();
+		delete[]farEnd_old;
+		delete[]farEnd_new;
+		delete[]nearEnd_f;
 		return S_OK;
 	}
+
 	goto BeginProcess;
 	return S_OK;
 }
