@@ -11,7 +11,7 @@ using namespace std;
 const int ciFrameSize = 480;
 const int REFTIMES_PER_SEC = 10000000;
 const int REFTIMES_PER_MILLISEC = 10000;
-const int audioLength5s = 240000;
+const int audioLength5s = 48000;
 const int audioLength1s = 48000;
 const int audioLength500ms = 24000;
 const int audioLength200ms = 9600;
@@ -99,7 +99,7 @@ LRESULT SaveToFile()
 		while (OutputDataQueue->next != nullptr)
 		{
 			BufferSize += OutputDataQueue->size;
-			Buffer.insert(Buffer.end(), OutputDataQueue->data, OutputDataQueue->data + OutputDataQueue->size);
+			Buffer.insert(Buffer.end(), OutputDataQueue->data, OutputDataQueue->data + OutputDataQueue->size * 2);
 			OutputDataQueue = OutputDataQueue->next;
 		}
 		BufferSize *= sizeof(float);
@@ -233,7 +233,7 @@ HRESULT SaveCaptureDataThread()
 HRESULT RenderThread()
 {
 	HRESULT hr;
-	REFERENCE_TIME hnsRequestedDuration = REFTIMES_PER_SEC;
+	REFERENCE_TIME hnsRequestedDuration = REFTIMES_PER_SEC / 10;
 	IMMDeviceEnumerator *pEnumerator = NULL;
 	IMMDevice *pDevice = NULL;
 	IAudioClient *pAudioClient = NULL;
@@ -340,7 +340,7 @@ HRESULT RenderThread()
 		{
 			goto RenderStop;
 		}
-		Sleep(500);
+		Sleep(50);
 		EXIT_ON_ERROR(hr);
 	}
 
@@ -482,7 +482,7 @@ LRESULT ProcessThread()
 {
 
 
-	int iter = 20;
+	int iter = 50;
 	float *nearEnd_f = new float[audioLength5s + iter];
 	float *farEnd_new = new float[audioLength5s + iter];
 	float *farEnd_old = new float[audioLength5s + iter];
@@ -563,13 +563,13 @@ ContinueProcess:
 	float *farEnd_tmp = new float[audioLength5s + iter];
 	float *echo_f = new float[audioLength5s + iter];
 	ZeroMemory(echo_f, sizeof(float)*(audioLength5s + iter));
-	if(delay>0)
+	if (delay > 0)
 	{
 		CopyMemory(farEnd_tmp, farEnd_old + audioLength5s + iter - delay, delay * sizeof(float));
 		CopyMemory(farEnd_tmp + delay, farEnd_new, sizeof(float)*(audioLength5s + iter - delay));
 		farEnd = emxCreateWrapper_real32_T(farEnd_tmp, 1, audioLength5s + iter);
 		nearEnd = emxCreateWrapper_real32_T(nearEnd_f, 1, audioLength5s + iter);
-		
+
 		echo = emxCreateWrapper_real32_T(echo_f, 1, audioLength5s + iter);
 		m = emxCreateWrapper_real32_T(echo_f, 1, iter);
 		en = emxCreateWrapper_real32_T(echo_f, audioLength5s + iter, 1);
